@@ -1,268 +1,352 @@
 {"0": {
+    "doc": "ERPNext Deployment",
+    "title": "ERPNext Deployment",
+    "content": "ERPNext is an open-source, all-in-one enterprise resource planning (ERP) software that helps businesses manage operations like accounting, inventory, HR, and more in an easy-to-use platform. | What is ERPNext? | Steps to follow | Install Docker, and Docker-Compose . | Install Docker Engine | Install Docker-Compose | . | Deploy Nginx Proxy Manager . | Create a new file docker-compose.yml file. | Start the ERPNext | Login to the web UI of ERPNext | . | Screenshots | . ",
+    "url": "/docs/deployments/erpnext/",
+    
+    "relUrl": "/docs/deployments/erpnext/"
+  },"1": {
+    "doc": "ERPNext Deployment",
+    "title": "What is ERPNext?",
+    "content": "ERPNext is a comprehensive, open-source ERP solution designed to streamline and automate a wide range of business processes. Built with simplicity and flexibility in mind, it caters to organizations of all sizes across various industries. Key features include: . | Accounting: Manage finances, invoices, payments, and reports. | Inventory Management: Track stock levels, manage warehouses, and optimize supply chains. | Human Resources: Handle employee records, payroll, and recruitment seamlessly. | CRM: Enhance customer relationships with tools for tracking leads, opportunities, and interactions. | Project Management: Plan, execute, and monitor projects with timelines and task assignments. | Manufacturing: Simplify production planning, BOMs, and work orders. | Customizability: Offers modular design and user-friendly customization for diverse needs. | . ERPNext provides a modern, cloud-based interface and is backed by an active community, making it a cost-effective choice for businesses seeking a scalable and open-source ERP system. Website Documentation GitHub Demo . In this tutorial, we are going to install ERPNext with the Docker Compose. ",
+    "url": "/docs/deployments/erpnext/#what-is-erpnext",
+    
+    "relUrl": "/docs/deployments/erpnext/#what-is-erpnext"
+  },"2": {
+    "doc": "ERPNext Deployment",
+    "title": "Steps to follow",
+    "content": ". | Install Docker, and Docker-Compose | Deploy ERPNext | . ",
+    "url": "/docs/deployments/erpnext/#steps-to-follow",
+    
+    "relUrl": "/docs/deployments/erpnext/#steps-to-follow"
+  },"3": {
+    "doc": "ERPNext Deployment",
+    "title": "Install Docker, and Docker-Compose",
+    "content": "Install Docker Engine . Note . Find the official guide here. Follow this official guide for install Docker on other Linux distribution systems. 1. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . 2. Set up the repository . Update the apt package index and install packages to allow apt to use a repository over HTTPS: . sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . Add Docker’s official GPG key: . sudo mkdir -m 0755 -p /etc/apt/keyrings curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . Use the following command to set up the repository: . echo \\ \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\ $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . 3. Install Docker Engine . sudo apt-get update sudo apt-get install docker-ce docker-ce-cli containerd.io . Verify that the Docker Engine is installed correctly. sudo systemctl is-active docker . Install Docker-Compose . In this case (29/12/2024), it is v2.31.0; Refer to the GitHub Releases to identify the latest version. Download and install Compose standalone latest version . curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose sudo chmod +x /usr/local/bin/docker-compose . Verify that the Docker-Compose is installed correctly. sudo docker-compose --version . Add your linux user to the Docker group (*optional) . sudo usermod -aG docker $USER . ",
+    "url": "/docs/deployments/erpnext/#install-docker-and-docker-compose",
+    
+    "relUrl": "/docs/deployments/erpnext/#install-docker-and-docker-compose"
+  },"4": {
+    "doc": "ERPNext Deployment",
+    "title": "Deploy Nginx Proxy Manager",
+    "content": "Create a new file docker-compose.yml file. version: \"3\" services: backend: image: frappe/erpnext:v15.44.0 restart: unless-stopped volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs configurator: image: frappe/erpnext:v15.44.0 entrypoint: - bash - -c # add redis_socketio for backward compatibility command: - &gt; ls -1 apps &gt; sites/apps.txt; bench set-config -g db_host $$DB_HOST; bench set-config -gp db_port $$DB_PORT; bench set-config -g redis_cache \"redis://$$REDIS_CACHE\"; bench set-config -g redis_queue \"redis://$$REDIS_QUEUE\"; bench set-config -g redis_socketio \"redis://$$REDIS_QUEUE\"; bench set-config -gp socketio_port $$SOCKETIO_PORT; environment: DB_HOST: db DB_PORT: \"3306\" REDIS_CACHE: redis-cache:6379 REDIS_QUEUE: redis-queue:6379 SOCKETIO_PORT: \"9000\" volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs create-site: image: frappe/erpnext:v15.15.0 volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs entrypoint: - bash - -c command: - &gt; wait-for-it -t 120 db:3306; wait-for-it -t 120 redis-cache:6379; wait-for-it -t 120 redis-queue:6379; export start=`date +%s`; until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r \".db_host // empty\"` ]] &amp;&amp; \\ [[ -n `grep -hs ^ sites/common_site_config.json | jq -r \".redis_cache // empty\"` ]] &amp;&amp; \\ [[ -n `grep -hs ^ sites/common_site_config.json | jq -r \".redis_queue // empty\"` ]]; do echo \"Waiting for sites/common_site_config.json to be created\"; sleep 5; if (( `date +%s`-start &gt; 120 )); then echo \"could not find sites/common_site_config.json with required keys\"; exit 1 fi done; echo \"sites/common_site_config.json found\"; bench new-site --no-mariadb-socket --admin-password=admin --db-root-password=admin --install-app erpnext --set-default frontend; db: image: mariadb:10.6 healthcheck: test: mysqladmin ping -h localhost --password=admin interval: 1s retries: 15 restart: unless-stopped command: - --character-set-server=utf8mb4 - --collation-server=utf8mb4_unicode_ci - --skip-character-set-client-handshake - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6 environment: MYSQL_ROOT_PASSWORD: admin volumes: - db-data:/var/lib/mysql frontend: image: frappe/erpnext:v15.15.0 depends_on: - websocket restart: unless-stopped command: - nginx-entrypoint.sh environment: BACKEND: backend:8000 FRAPPE_SITE_NAME_HEADER: frontend SOCKETIO: websocket:9000 UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1 UPSTREAM_REAL_IP_HEADER: X-Forwarded-For UPSTREAM_REAL_IP_RECURSIVE: \"off\" PROXY_READ_TIMEOUT: 120 CLIENT_MAX_BODY_SIZE: 50m volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs ports: - \"8080:8080\" queue-long: image: frappe/erpnext:v15.15.0 restart: unless-stopped command: - bench - worker - --queue - long,default,short volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs queue-short: image: frappe/erpnext:v15.15.0 restart: unless-stopped command: - bench - worker - --queue - short,default volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs redis-queue: image: redis:6.2-alpine restart: unless-stopped volumes: - redis-queue-data:/data redis-cache: image: redis:6.2-alpine restart: unless-stopped volumes: - redis-cache-data:/data scheduler: image: frappe/erpnext:v15.15.0 restart: unless-stopped command: - bench - schedule volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs websocket: image: frappe/erpnext:v15.15.0 restart: unless-stopped command: - node - /home/frappe/frappe-bench/apps/frappe/socketio.js volumes: - sites:/home/frappe/frappe-bench/sites - logs:/home/frappe/frappe-bench/logs volumes: db-data: redis-queue-data: redis-cache-data: sites: logs: . Start the ERPNext . docker-compose up -d # check the container status docker-compose ps . Login to the web UI of ERPNext . Default Admin User: . Username: Administrator Password: admin . Now you can log in to the web UI. Simply use your browser to connect to your server by using the IP address or an FQDN and connect on port 8080. Next, you should change your username and password, and that’s it! . NGINX Configuration (If you are behind a reverse proxy) . Replace ip_address with the IP address of your ERPNext instance, or use 127.0.0.1 if the Nginx server is running on the same instance. # /etc/nginx/sites-available/your_domain.com server { listen 80; server_name your_domain.com; location / { proxy_pass http://ip_address:8080; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; } } . ",
+    "url": "/docs/deployments/erpnext/#deploy-nginx-proxy-manager",
+    
+    "relUrl": "/docs/deployments/erpnext/#deploy-nginx-proxy-manager"
+  },"5": {
+    "doc": "ERPNext Deployment",
+    "title": "Screenshots",
+    "content": ". ",
+    "url": "/docs/deployments/erpnext/#screenshots",
+    
+    "relUrl": "/docs/deployments/erpnext/#screenshots"
+  },"6": {
     "doc": "Deployment Guides",
     "title": "Intallation &amp; Deployment Guides",
     "content": "Step-by-step guides for installing and deploying various software and systems with code snippets . ",
     "url": "/docs/deployments#intallation--deployment-guides",
     
     "relUrl": "/docs/deployments#intallation--deployment-guides"
-  },"1": {
+  },"7": {
     "doc": "Deployment Guides",
     "title": "Deployment Guides",
     "content": " ",
     "url": "/docs/deployments",
     
     "relUrl": "/docs/deployments"
-  },"2": {
+  },"8": {
     "doc": "Home",
     "title": "Learn to Develop, Install, and Deploy Software &amp; Systems with Easy-to-Follow Guides",
     "content": "Welcome to my blog, where I’ll be sharing step-by-step guides for developing, installing, and deploying web and offline software and systems. My goal is to share my knowledge and findings with others who are interested in learning more about software development and system administration. I’ve found that there are many people who are interested in learning how to build their own software or deploy existing software to their systems. However, the process can be overwhelming, especially for those who are new to the field. That’s why I’ve created this blog. I want to share my expertise and provide easy-to-follow guides that anyone can use to get started with software development, installation, and deployment. Whether you’re a beginner or an experienced developer, I hope you’ll find something useful here. My main hope is that this blog will help others learn and grow in the field of software development and system administration. I believe that knowledge should be shared, and I’m excited to contribute to the community in this way. So, if you’re interested in learning more about software development and deployment, stay tuned for my upcoming posts! . Website GitHub . ",
     "url": "/#learn-to-develop-install-and-deploy-software--systems-with-easy-to-follow-guides",
     
     "relUrl": "/#learn-to-develop-install-and-deploy-software--systems-with-easy-to-follow-guides"
-  },"3": {
+  },"9": {
     "doc": "Home",
     "title": "Home",
     "content": " ",
     "url": "/",
     
     "relUrl": "/"
-  },"4": {
+  },"10": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "Nginx Proxy Manager Deployment",
     "content": "Nginx Proxy Manager is a user-friendly, web-based tool for managing Nginx reverse proxies, SSL certificates, and access controls with ease. | What is Nginx Proxy Manager? | Steps to follow | Install Docker, and Docker-Compose . | Install Docker Engine | Install Docker-Compose | . | Deploy Nginx Proxy Manager . | Create a new file docker-compose.yml file. | Using SQLite Database | Using MySQL / MariaDB Database | . | Start the Nginx Proxy Manager | Login to the web UI of NGINX proxy manager | . | Screenshots | . ",
     "url": "/docs/deployments/nginx-proxy-manager/",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/"
-  },"5": {
+  },"11": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "What is Nginx Proxy Manager?",
     "content": "Nginx Proxy Manager (NPM) is a user-friendly, web-based interface for managing reverse proxies powered by Nginx. It simplifies the process of configuring and managing proxies, making it accessible even for users with minimal technical experience. Key features include: . | Reverse Proxy Management: Easily route traffic to different backend services based on domain names or paths. | SSL Management: Automates the issuance and renewal of SSL/TLS certificates via Let’s Encrypt for secure connections. | Access Control: Allows you to set up basic authentication and control access to your services. | Customizable Configuration: Supports advanced Nginx features for tailored setups. | Easy-to-Use Interface: Intuitive dashboard for managing domains, SSL certificates, and proxy rules. | . Nginx Proxy Manager is ideal for small to medium-sized setups, such as self-hosted applications, where ease of use and quick deployment are priorities. It bridges the gap between Nginx’s robust functionality and a beginner-friendly experience. Website Documentation GitHub . In this tutorial, we are going to install Nginx Proxy Manager with the Docker Compose. ",
     "url": "/docs/deployments/nginx-proxy-manager/#what-is-nginx-proxy-manager",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/#what-is-nginx-proxy-manager"
-  },"6": {
+  },"12": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "Steps to follow",
     "content": ". | Install Docker, and Docker-Compose | Deploy Nginx Proxy Manager | . ",
     "url": "/docs/deployments/nginx-proxy-manager/#steps-to-follow",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/#steps-to-follow"
-  },"7": {
+  },"13": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "Install Docker, and Docker-Compose",
-    "content": "Docker Engine is an open source containerization technology for building and containerizing your applications. Docker Engine acts as a client-server application with: . | A server with a long-running daemon process dockerd. | APIs which specify interfaces that programs can use to talk to and instruct the Docker daemon. | A command line interface (CLI) client docker. | . The CLI uses Docker APIs to control or interact with the Docker daemon through scripting or direct CLI commands. Many other Docker applications use the underlying API and CLI. The daemon creates and manage Docker objects, such as images, containers, networks, and volumes. Install Docker Engine . | Documentation | . Official . Note . Find the official guide here. Follow this official guide for install Docker on other Linux distribution systems. 1. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . 2. Set up the repository . Update the apt package index and install packages to allow apt to use a repository over HTTPS: . sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . Add Docker’s official GPG key: . sudo mkdir -m 0755 -p /etc/apt/keyrings curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . Use the following command to set up the repository: . echo \\ \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\ $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . 3. Install Docker Engine . sudo apt-get update sudo apt-get install docker-ce docker-ce-cli containerd.io . Verify that the Docker Engine is installed correctly. sudo systemctl is-active docker . Install Docker-Compose . In this case (20/03/2023), it is v2.16.0; Refer to the GitHub Releases to identify the latest version. Download and install Compose standalone latest version . curl -SL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose sudo chmod +x /usr/local/bin/docker-compose . Verify that the Docker-Compose is installed correctly. sudo docker-compose --version . Add your linux user to the Docker group (*optional) . sudo usermod -aG docker $USER . ",
+    "content": "Docker Engine is an open source containerization technology for building and containerizing your applications. Docker Engine acts as a client-server application with: . | A server with a long-running daemon process dockerd. | APIs which specify interfaces that programs can use to talk to and instruct the Docker daemon. | A command line interface (CLI) client docker. | . The CLI uses Docker APIs to control or interact with the Docker daemon through scripting or direct CLI commands. Many other Docker applications use the underlying API and CLI. The daemon creates and manage Docker objects, such as images, containers, networks, and volumes. Install Docker Engine . | Documentation | . Official . Note . Find the official guide here. Follow this official guide for install Docker on other Linux distribution systems. 1. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . 2. Set up the repository . Update the apt package index and install packages to allow apt to use a repository over HTTPS: . sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . Add Docker’s official GPG key: . sudo mkdir -m 0755 -p /etc/apt/keyrings curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . Use the following command to set up the repository: . echo \\ \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\ $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . 3. Install Docker Engine . sudo apt-get update sudo apt-get install docker-ce docker-ce-cli containerd.io . Verify that the Docker Engine is installed correctly. sudo systemctl is-active docker . Install Docker-Compose . In this case (29/12/2024), it is v2.31.0; Refer to the GitHub Releases to identify the latest version. Download and install Compose standalone latest version . curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose sudo chmod +x /usr/local/bin/docker-compose . Verify that the Docker-Compose is installed correctly. sudo docker-compose --version . Add your linux user to the Docker group (*optional) . sudo usermod -aG docker $USER . ",
     "url": "/docs/deployments/nginx-proxy-manager/#install-docker-and-docker-compose",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/#install-docker-and-docker-compose"
-  },"8": {
+  },"14": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "Deploy Nginx Proxy Manager",
-    "content": "Important . Please note, that DB_MYSQL_* environment variables will take precedent over DB_SQLITE_* variables. So if you keep the MySQL variables, you will not be able to use SQLite. Create a new file docker-compose.yml file. Using SQLite Database . version: '3.8' services: app: image: 'jc21/nginx-proxy-manager:latest' restart: unless-stopped ports: # These ports are in format &lt;host-port&gt;:&lt;container-port&gt; - '80:80' # Public HTTP Port - '443:443' # Public HTTPS Port - '81:81' # Admin Web Port # Add any other Stream port you want to expose # - '21:21' # FTP # Uncomment the next line if you uncomment anything in the section # environment: # Uncomment this if you want to change the location of # the SQLite DB file within the container # DB_SQLITE_FILE: \"/data/database.sqlite\" # Uncomment this if IPv6 is not enabled on your host # DISABLE_IPV6: 'true' volumes: - ./data:/data - ./letsencrypt:/etc/letsencrypt . Using MySQL / MariaDB Database . version: '3.8' services: app: image: 'jc21/nginx-proxy-manager:latest' restart: unless-stopped ports: # These ports are in format &lt;host-port&gt;:&lt;container-port&gt; - '80:80' # Public HTTP Port - '443:443' # Public HTTPS Port - '81:81' # Admin Web Port # Add any other Stream port you want to expose # - '21:21' # FTP environment: # Mysql/Maria connection parameters: DB_MYSQL_HOST: \"db\" DB_MYSQL_PORT: 3306 DB_MYSQL_USER: \"npm\" DB_MYSQL_PASSWORD: \"npm\" DB_MYSQL_NAME: \"npm\" # Uncomment this if IPv6 is not enabled on your host # DISABLE_IPV6: 'true' volumes: - ./data:/data - ./letsencrypt:/etc/letsencrypt depends_on: - db db: image: 'jc21/mariadb-aria:latest' restart: unless-stopped environment: MYSQL_ROOT_PASSWORD: 'npm' MYSQL_DATABASE: 'npm' MYSQL_USER: 'npm' MYSQL_PASSWORD: 'npm' MARIADB_AUTO_UPGRADE: '1' volumes: - ./mysql:/var/lib/mysql . Start the Nginx Proxy Manager . docker-compose up -d # check the container status docker-compose ps . Login to the web UI of NGINX proxy manager . Default Admin User: . Username: admin@example.com Password: changeme . Now we can log in to the web UI. Simply use your browser to connect to your server by using the IP address or an FQDN and connect on port 81. Log in with the username admin@example.com and the password changeme. Next, you should change your username and password, and that’s it! . ",
+    "content": "Important . Please note, that DB_MYSQL_* environment variables will take precedent over DB_SQLITE_* variables. So if you keep the MySQL variables, you will not be able to use SQLite. Create a new file docker-compose.yml file. Using SQLite Database . version: '3.8' services: app: image: 'jc21/nginx-proxy-manager:latest' restart: unless-stopped ports: # These ports are in format &lt;host-port&gt;:&lt;container-port&gt; - '80:80' # Public HTTP Port - '443:443' # Public HTTPS Port - '81:81' # Admin Web Port # Add any other Stream port you want to expose # - '21:21' # FTP # Uncomment the next line if you uncomment anything in the section # environment: # Uncomment this if you want to change the location of # the SQLite DB file within the container # DB_SQLITE_FILE: \"/data/database.sqlite\" # Uncomment this if IPv6 is not enabled on your host # DISABLE_IPV6: 'true' volumes: - ./data:/data - ./letsencrypt:/etc/letsencrypt . Using MySQL / MariaDB Database . version: '3.8' services: app: image: 'jc21/nginx-proxy-manager:latest' restart: unless-stopped ports: # These ports are in format &lt;host-port&gt;:&lt;container-port&gt; - '80:80' # Public HTTP Port - '443:443' # Public HTTPS Port - '81:81' # Admin Web Port # Add any other Stream port you want to expose # - '21:21' # FTP environment: # Mysql/Maria connection parameters: DB_MYSQL_HOST: \"db\" DB_MYSQL_PORT: 3306 DB_MYSQL_USER: \"npm\" DB_MYSQL_PASSWORD: \"npm\" DB_MYSQL_NAME: \"npm\" # Uncomment this if IPv6 is not enabled on your host # DISABLE_IPV6: 'true' volumes: - ./data:/data - ./letsencrypt:/etc/letsencrypt depends_on: - db db: image: 'jc21/mariadb-aria:latest' restart: unless-stopped environment: MYSQL_ROOT_PASSWORD: 'npm' MYSQL_DATABASE: 'npm' MYSQL_USER: 'npm' MYSQL_PASSWORD: 'npm' MARIADB_AUTO_UPGRADE: '1' volumes: - ./mysql:/var/lib/mysql . Start the Nginx Proxy Manager . docker-compose up -d # check the container status docker-compose ps . Login to the web UI of NGINX proxy manager . Default Admin User: . Username: admin@example.com Password: changeme . Now you can log in to the web UI. Simply use your browser to connect to your server by using the IP address or an FQDN and connect on port 81. Log in with the username admin@example.com and the password changeme. Next, you should change your username and password, and that’s it! . ",
     "url": "/docs/deployments/nginx-proxy-manager/#deploy-nginx-proxy-manager",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/#deploy-nginx-proxy-manager"
-  },"9": {
+  },"15": {
     "doc": "Nginx Proxy Manager Deployment",
     "title": "Screenshots",
     "content": ". ",
     "url": "/docs/deployments/nginx-proxy-manager/#screenshots",
     
     "relUrl": "/docs/deployments/nginx-proxy-manager/#screenshots"
-  },"10": {
+  },"16": {
     "doc": "OrangeHRM Deployment",
     "title": "OrangeHRM Deployment &amp; Upgrade on Linux",
     "content": "OrangeHRM is an open-source human resource management system. | What is OrangeHRM? | Steps to follow | Install and Configure Prerequisites . | Step 01: Install PHP and the required dependencies | Step 02: Install &amp; configure MySQL Database | Step 03: Install &amp; configure a web server (Apache or Nginx) | . | Deploy OrangeHRM Software . | Download the latest or preferred version of the OrangeHRM system. | Web Server Configurations | Web Installation Process | . | Upgrade OrangeHRM Software . | Backup the MySQL Database | Download the latest or preferred version of the OrangeHRM system. | Web Server Configurations | Web Upgrade Process | . | Screenshots | . ",
     "url": "/docs/deployments/orangehrm/#orangehrm-deployment--upgrade-on-linux",
     
     "relUrl": "/docs/deployments/orangehrm/#orangehrm-deployment--upgrade-on-linux"
-  },"11": {
+  },"17": {
     "doc": "OrangeHRM Deployment",
     "title": "What is OrangeHRM?",
     "content": "OrangeHRM is an open-source human resource management (HRM) software that provides a comprehensive set of tools and features to manage various HR functions such as employee information, recruitment, performance management, time and attendance tracking, leave management, and more. OrangeHRM offers both cloud-based and on-premises deployment options, and it is designed to be user-friendly and customizable to meet the specific needs of different organizations. Website Documentation SourceForge GitHub Demo . In this tutorial, we are going to install OrangeHRM with a web server (Nginx and Apache) on Linux and use Kali as the Linux distribution system. ",
     "url": "/docs/deployments/orangehrm/#what-is-orangehrm",
     
     "relUrl": "/docs/deployments/orangehrm/#what-is-orangehrm"
-  },"12": {
+  },"18": {
     "doc": "OrangeHRM Deployment",
     "title": "Steps to follow",
     "content": ". | Install and Configure Prerequisites . | Install PHP and the required dependencies | Install &amp; configure MySQL Database | Install &amp; configure a web server (Apache or Nginx) | . | Deploy OrangeHRM software | Upgrade OrangeHRM software | . ",
     "url": "/docs/deployments/orangehrm/#steps-to-follow",
     
     "relUrl": "/docs/deployments/orangehrm/#steps-to-follow"
-  },"13": {
+  },"19": {
     "doc": "OrangeHRM Deployment",
     "title": "Install and Configure Prerequisites",
     "content": "Step 01: Install PHP and the required dependencies . OrangeHRM version 4 required PHP 7.0 - 7.4 &amp; OrangeHRM version 5 required PHP 7.4 or later. sudo apt update &amp;&amp; sudo apt upgrade sudo apt install php7.4 php7.4-mysql php7.4-curl php7.4-xml php7.4-zip . Step 02: Install &amp; configure MySQL Database . OrangeHRM required MySQL 5.5 or later/ MariaDB 5.5 or later . Installation . sudo apt install mysql-server . Configuration . Change the database root user password, if needed; . sudo mysql ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password'; OR ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password by '&lt;new-password&gt;'; . You can create a database and user for the system in the web installation of the OrangeHRM. If you prefer that option, skip the following step of manually creating those. Manually create a database and user for the OrangeHRM system; . sudo mysql -u root -p . CREATE DATABASE &lt;db-name&gt;; CREATE USER '&lt;db-user&gt;'@'localhost' IDENTIFIED BY '&lt;password&gt;'; GRANT ALL PRIVILEGES ON &lt;db-name&gt;.* TO '&lt;db-user&gt;'@'localhost'; flush privileges; quit; . Add following lines to the my.cnf or my.ini file locate at /etc/mysql/. [mysqld] event_scheduler=ON . Restart MySQL service . sudo service mysql restart OR sudo systemctl restart mysql . Step 03: Install &amp; configure a web server (Apache or Nginx) . Install and configure one of the web servers as you prefer. Don’t install both servers at the same time.😊 . Installation . Nginx . sudo apt install nginx . Apache . sudo apt install apache2 . Configuration . Nginx . Edit the root of the default nginx configuration file located at /etc/nginx/sites-available/default. sudo nano /etc/nginx/sites-available/default . sudo systemctl restart nginx . Apache . Edit the DocumentRoot of the default apache configuration file located at /etc/apache2/sites-available/000-default.conf. sudo nano /etc/apache2/sites-available/000-default.conf . sudo service apache2 restart OR sudo systemctl reload apache2 . ",
     "url": "/docs/deployments/orangehrm/#install-and-configure-prerequisites",
     
     "relUrl": "/docs/deployments/orangehrm/#install-and-configure-prerequisites"
-  },"14": {
+  },"20": {
     "doc": "OrangeHRM Deployment",
     "title": "Deploy OrangeHRM Software",
     "content": "Download the latest or preferred version of the OrangeHRM system. Go to the OrangeHRM GitHub repository and select releases from the right side panel. Then select your preferred version and right-click and copy the link on the orangehrm-&lt;version&gt;.zip file located in the Assets section. Install Zip &amp; Unzip on Linux (Debian) . sudo apt install zip unzip . | Select Release | Copy the link | . | | | . Then go to the web server directory and download the setup (replace the &lt;url&gt; with the copied link). After the download is complete, unzip the file to the web directory (replace &lt;file-name&gt; with the actual file name of the downloaded file). cd /var/www/html sudo wget &lt;url&gt; sudo unzip &lt;file-name&gt; . Web Server Configurations . After unzipping the file, reconfigure the web server’s root location configurations to point to the unzipped directory. Web Installation Process . Finally, Go to the domain/IP address mapped to the system using a web browser and start the web installation process. Please refer to the following video guide: . For further details, kindly consult the OrangeHRM Official Installation Guide. ",
     "url": "/docs/deployments/orangehrm/#deploy-orangehrm-software",
     
     "relUrl": "/docs/deployments/orangehrm/#deploy-orangehrm-software"
-  },"15": {
+  },"21": {
     "doc": "OrangeHRM Deployment",
     "title": "Upgrade OrangeHRM Software",
     "content": "Backup the MySQL Database . Replace &lt;db-user&gt;, &lt;db-name&gt;, and &lt;path&gt; with your OrangeHRM database user, database name, and the path you want to save the backup file. mysqldump -u &lt;db-user&gt; -p &lt;dn-name&gt; &gt; &lt;path&gt;/sqldump.sql . If got an error use below; . mysqldump --column-statistics=0 -u &lt;db-user&gt; -p &lt;db-name&gt; &gt; &lt;path&gt;/sqldump.sql . Download the latest or preferred version of the OrangeHRM system. Go to the OrangeHRM GitHub repository and select releases from the right side panel. Then select your preferred version and right-click and copy the link on the orangehrm-&lt;version&gt;.zip file located in the Assets section. Then go to the web server directory and download the setup (replace the &lt;url&gt; with the copied link). After the download is complete, unzip the file to the web directory (replace &lt;file-name&gt; with the actual file name of the downloaded file). cd /var/www/html sudo wget &lt;url&gt; sudo unzip &lt;file-name&gt; . Web Server Configurations . There are two ways to do this. The first way is to rename the old OrangeHRM directory to a different name and rename the newly created OrangeHRM directory to the previous name. And the second way is to reconfigure the web server (Nginx or Apache) to map to the newly created web directory. Web Upgrade Process . Finally, Go to the domain/IP address mapped to the system using a web browser and start the web upgrade process. Please refer to the following video guide: . For further details, kindly consult the OrangeHRM Official Upgrade Guide. ",
     "url": "/docs/deployments/orangehrm/#upgrade-orangehrm-software",
     
     "relUrl": "/docs/deployments/orangehrm/#upgrade-orangehrm-software"
-  },"16": {
+  },"22": {
     "doc": "OrangeHRM Deployment",
     "title": "Screenshots",
     "content": ". ",
     "url": "/docs/deployments/orangehrm/#screenshots",
     
     "relUrl": "/docs/deployments/orangehrm/#screenshots"
-  },"17": {
+  },"23": {
     "doc": "OrangeHRM Deployment",
     "title": "OrangeHRM Deployment",
     "content": " ",
     "url": "/docs/deployments/orangehrm/",
     
     "relUrl": "/docs/deployments/orangehrm/"
-  },"18": {
+  },"24": {
     "doc": "Portainer Deployment",
     "title": "Portainer Deployment on Linux (Ubuntu) via Docker &amp; Docker-Compose",
     "content": "Portainer is a lightweight management UI that allows you to easily manage your different Docker environments. | What is Portainer? | Steps to follow | Prerequisites | Install Docker, and Docker-Compose . | Install Docker Engine . | Uninstall old versions | Set up the repository | Install Docker Engine | . | Install Docker-Compose | . | Install &amp; Set up Portainer . | Create a new Docker Volume | Launch Portainer | Logging In | . | Screenshots | . ",
     "url": "/docs/deployments/portainer/#portainer-deployment-on-linux-ubuntu-via-docker--docker-compose",
     
     "relUrl": "/docs/deployments/portainer/#portainer-deployment-on-linux-ubuntu-via-docker--docker-compose"
-  },"19": {
+  },"25": {
     "doc": "Portainer Deployment",
     "title": "What is Portainer?",
     "content": "Portainer Community Edition (CE) is a powerful, open-source toolset that allows you to easily build and manage containers in Docker, Docker Swarm, Kubernetes, and Azure ACI. Portainer consists of two elements, the Portainer Server, and the Portainer Agent. Both elements run as lightweight Docker containers on a Docker engine. Portainer CE is available to install with Docker on Linux, Docker on WSL/Docker Desktop, and Docker on Windows Container Service. Website Documentation . In this tutorial, we are going to install Portainer with Docker on the Linux and use Ubuntu as the Linux distribution systems. ",
     "url": "/docs/deployments/portainer/#what-is-portainer",
     
     "relUrl": "/docs/deployments/portainer/#what-is-portainer"
-  },"20": {
+  },"26": {
     "doc": "Portainer Deployment",
     "title": "Steps to follow",
     "content": ". | Install Docker and Docker-Compose | Install &amp; Set up Portainer | . ",
     "url": "/docs/deployments/portainer/#steps-to-follow",
     
     "relUrl": "/docs/deployments/portainer/#steps-to-follow"
-  },"21": {
+  },"27": {
     "doc": "Portainer Deployment",
     "title": "Prerequisites",
     "content": "To install Docker Engine on Ubuntu, you need the 64-bit version of one of these Ubuntu versions: . | Ubuntu Kinetic 22.10 | Ubuntu Jammy 22.04 (LTS) | Ubuntu Focal 20.04 (LTS) | Ubuntu Bionic 18.04 (LTS) | . Docker Engine is compatible with x86_64 (or amd64), armhf, arm64, and s390x architectures. If you are using another Linux distribution system, check out Docker’s official documentation for prerequisites. ",
     "url": "/docs/deployments/portainer/#prerequisites",
     
     "relUrl": "/docs/deployments/portainer/#prerequisites"
-  },"22": {
+  },"28": {
     "doc": "Portainer Deployment",
     "title": "Install Docker, and Docker-Compose",
     "content": "Docker Engine is an open source containerization technology for building and containerizing your applications. Docker Engine acts as a client-server application with: . | A server with a long-running daemon process dockerd. | APIs which specify interfaces that programs can use to talk to and instruct the Docker daemon. | A command line interface (CLI) client docker. | . The CLI uses Docker APIs to control or interact with the Docker daemon through scripting or direct CLI commands. Many other Docker applications use the underlying API and CLI. The daemon creates and manage Docker objects, such as images, containers, networks, and volumes. Install Docker Engine . | Documentation | . Official . Follow this Official Guide for install Docker Engine on other Linux distribution systems. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . Set up the repository . Update the apt package index and install packages to allow apt to use a repository over HTTPS: . sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . Add Docker’s official GPG key: . sudo mkdir -m 0755 -p /etc/apt/keyrings curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . Use the following command to set up the repository: . echo \\ \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\ $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . Install Docker Engine . sudo apt-get update sudo apt-get install docker-ce docker-ce-cli containerd.io . Verify that the Docker Engine is installed correctly. sudo systemctl is-active docker . Install Docker-Compose . Download and install Compose standalone latest version. In this case (20/03/2023), it is v2.16.0; Refer to the Official Documentation to identify the latest version. curl -SL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose sudo chmod +x /usr/local/bin/docker-compose . Verify that the Docker-Compose is installed correctly. sudo docker-compose --version . ",
     "url": "/docs/deployments/portainer/#install-docker-and-docker-compose",
     
     "relUrl": "/docs/deployments/portainer/#install-docker-and-docker-compose"
-  },"23": {
+  },"29": {
     "doc": "Portainer Deployment",
     "title": "Install &amp; Set up Portainer",
     "content": "For further details, kindly consult the Official Documentation. Create a new Docker Volume . This volume that Portainer Server will use to store its database. docker volume create portainer_data . Launch Portainer . Download and install the Portainer Server container. docker run -d -p 8000:8000 -p 9443:9443 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce . Logging In . Logging into your Portainer Server instance by opening a web browser and going to: . https://localhost:9443 . Replace localhost with the relevant IP address or FQDN if needed, and adjust the port if you changed it earlier. ",
     "url": "/docs/deployments/portainer/#install--set-up-portainer",
     
     "relUrl": "/docs/deployments/portainer/#install--set-up-portainer"
-  },"24": {
+  },"30": {
     "doc": "Portainer Deployment",
     "title": "Screenshots",
     "content": ". ",
     "url": "/docs/deployments/portainer/#screenshots",
     
     "relUrl": "/docs/deployments/portainer/#screenshots"
-  },"25": {
+  },"31": {
     "doc": "Portainer Deployment",
     "title": "Portainer Deployment",
     "content": " ",
     "url": "/docs/deployments/portainer/",
     
     "relUrl": "/docs/deployments/portainer/"
-  },"26": {
+  },"32": {
     "doc": "Snipe-IT Deployment",
     "title": "Snipe-IT Deployment on Linux (Ubuntu) via Docker, Apache &amp; Nginx",
     "content": "Snipe-IT is web-based open-source software for asset management. | What is Snipe-IT? | Introduction | Features | Video Guides | Installation | Install Snipe-IT via Docker . | Install Docker Engine | Install Snipe-IT via Docker | . | Install Snipe-IT via Apache | Install Snipe-IT via Nginx | Pre-Flight | Screenshots | . ",
     "url": "/docs/deployments/snipe-it/#snipe-it-deployment-on-linux-ubuntu-via-docker-apache--nginx",
     
     "relUrl": "/docs/deployments/snipe-it/#snipe-it-deployment-on-linux-ubuntu-via-docker-apache--nginx"
-  },"27": {
+  },"33": {
     "doc": "Snipe-IT Deployment",
     "title": "What is Snipe-IT?",
     "content": "Snipe-IT was made for asset management, to enable departments to track who has which asset, when it was purchased, which software licenses and accessories are available, and so on. Snipe-IT is a Free Open Source (FOSS) web based project built on Laravel and it follows a standard Laravel MVC file structure. This project is actively developed and they release quite frequently. Check out the Snipe-IT website for a demo, a comprehensive list of features, screenshots and announcements for updates on new versions. Website Documentation Demo GitHub . I made a step-by-step guide of Snipe-IT installation, configuration, and its features for the Ministry of Technology Sri Lanka’s official website. I will provide links to each section of that documentation as follows: . ",
     "url": "/docs/deployments/snipe-it/#what-is-snipe-it",
     
     "relUrl": "/docs/deployments/snipe-it/#what-is-snipe-it"
-  },"28": {
+  },"34": {
     "doc": "Snipe-IT Deployment",
     "title": "Introduction",
     "content": "Overview, introduction, and getting started guide to the Snipe-IT asset management system. Snipe-IT Introduction . ",
     "url": "/docs/deployments/snipe-it/#introduction",
     
     "relUrl": "/docs/deployments/snipe-it/#introduction"
-  },"29": {
+  },"35": {
     "doc": "Snipe-IT Deployment",
     "title": "Features",
     "content": "Main features available on the system and a guide on how to use them correctly. Snipe-IT Features . ",
     "url": "/docs/deployments/snipe-it/#features",
     
     "relUrl": "/docs/deployments/snipe-it/#features"
-  },"30": {
+  },"36": {
     "doc": "Snipe-IT Deployment",
     "title": "Video Guides",
     "content": "This video guide includes feature reviews, configurations, and how to use the functionalities of the Snipe-IT system; it also includes the mobile application configuration and its features. Snipe-IT Videos Guides . ",
     "url": "/docs/deployments/snipe-it/#video-guides",
     
     "relUrl": "/docs/deployments/snipe-it/#video-guides"
-  },"31": {
+  },"37": {
     "doc": "Snipe-IT Deployment",
     "title": "Installation",
     "content": "The installation guide covers how to deploy Snipe-IT software on a Linux (Ubuntu) system via Docker, Apache, and Nginx services. This guide was created in June 2022, and later updates of Snipe-IT may make this guide’s configuration steps slightly different. ",
     "url": "/docs/deployments/snipe-it/#installation",
     
     "relUrl": "/docs/deployments/snipe-it/#installation"
-  },"32": {
+  },"38": {
     "doc": "Snipe-IT Deployment",
     "title": "Install Snipe-IT via Docker",
     "content": "Install Docker Engine . Note . Find the official guide here. Follow this official guide for install Docker on other Linux distribution systems. 1. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . 2. Set up the repository . | Update the apt package index and install packages to allow apt to use a repository over HTTPS: sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . | Add Docker’s official GPG key: sudo mkdir -p /etc/apt/keyrings . curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . | Use the following command to set up the repository: echo \\\"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\$(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . | . 3. Install Docker Engine . | Update the apt package index, and install the latest version of Docker Engine, containerd, and Docker Compose, or go to the next step to install a specific version: sudo apt-get install docker-ce docker-ce-cli containerd.io . | Verify that Docker Engine is installed correctly; sudo systemctl is-active docker . | . Install Snipe-IT via Docker . 1. Update/Upgrade installed packages . sudo apt update &amp;&amp; sudo apt upgrade . 2. Create directories for mount with Docker containers. | Create main directories sudo mkdir /var/config /var/config/snipeit . | Change the working directory to newly created snipeit directory. cd /var/config/ snipeit . | Create directories for mount with MySQL container and Snipe-IT container. sudo mkdir snipe-mysql snipe-conf snipe-backup . | . 3. Create a MySQL container with MySQL version 5.6 . Replace the placeholders with your preference. sudo docker run \\ --name snipe-mysql \\ -d \\ -e MYSQL_ROOT_PASSWORD= &lt;MYSQL_ROOT_PASSWORD&gt; \\ -e MYSQL_DATABASE=snipe \\ -e MYSQL_USER=snipe \\ -e MYSQL_PASSWORD= &lt;MYSQL_USER_PASSWORD&gt; \\ -e TZ=Asia/Colombo \\ -p 127.0.0.1:3306:3306 \\ -v /var/config/snipeit/snipe-mysql:/var/lib/mysql \\ mysql:5.6 --sql-mode=\"\" . 4. Create a Snipe-IT Docker image . Option 01: . | Generate a new snipe-it container with the latest version. sudo docker run --rm snipe/snipe-it . | . Option 02: . | Generate a new Snipe-IT container with specified version. Find the latest Snipe-IT docker image version here. sudo docker run --rm snipe/snipe-it:v6.0.2 . | . After the downloading, output should look like this; . Please re-run this container with an environment variable $APP_KEYAn example APP_KEY you could use is:base64:D5oGA+zhFSVA3VwuoZoQ21RAcwBtJv/RGiqOcZ7BUvI= . Copy the APP_KEY (“based64:D5…”) and replace it with the placeholder at the next step (step 5). 5. Start the Snipe-IT container . Option 01: SSL Disabled . | Replace the placeholders with your MySQL details (Step 3) and APP_KEY (* without an APP_KEY it won’t work). | . sudo docker create \\ --name=snipe-it \\ --link snipe-mysql:db \\ -e PUID=1000 \\ -e PGID=1000 \\ -e DB_CONNECTION=mysql \\ -e DB_HOST=snipe-mysql \\ -e DB_DATABASE=snipe \\ -e DB_USERNAME=snipe \\ -e DB_PASSWORD=[MYSQL_USER_PASSWORD] \\ -e APP_KEY=[APP_KEY] \\ -p 8082:80 \\ -v /var/config/snipeit/snipe-conf:/config \\ -v /var/config/snipeit/snipe-backup:/var/www/html/storage/app/backups \\ --restart unless-stopped \\ snipe/snipe-it #snipe/snipe-it:v6.0.2 . Option 02: SSL Enabled . | Replace the placeholders with your MySQL details (Step 3), SSL Port and APP_KEY (* without an APP_KEY it won’t work). | Later, place the SSL Key and SSL Certificate inside the snipe-it docker container using the docker cp command, at /var/lib/snipeit/ssl/snipeit-ssl.crt and /var/lib/snipeit/ssl/snipeit-ssl.key. | . sudo docker create \\ --name=snipe-it \\ --link snipe-mysql:db \\ -e PUID=1000 \\ -e PGID=1000 \\ -e DB_CONNECTION=mysql \\ -e DB_HOST=snipe-mysql \\ -e DB_DATABASE=snipe \\ -e DB_USERNAME=snipe \\ -e DB_PASSWORD=[MYSQL_USER_PASSWORD] \\ -e APP_KEY=[APP_KEY] \\ -p 8082:80 \\ -p [SSL_PORT]:443 \\ -v /var/config/snipeit/snipe-conf:/config \\ -v /var/config/snipeit/snipe-backup:/var/www/html/storage/app/backups \\ --restart unless-stopped \\ snipe/snipe-it # snipe/snipe-it:v6.0.2 . 6. Start the container. sudo docker start snipe-it . 7. Update the .env file with the site details and email configurations. | Get the docker containers details. sudo docker ps . | Get into the Snipe-IT container. sudo docker exec -it CONTAINER_ID /bin/bash . Default docker containers come with VI editor. If you want, you can install VIM or NANO editors using the following commands. apt-get update apt-get install vim nano . | Open .env file with an editor. vi .env . | Uncomment and update the basic app settings. Replace the APP_KEY placeholder with your APP_KEY (Step 4) and APP_URL with your site domain (http://example.com:8082). #-------------------------------------------- # REQUIRED: BASIC APP SETTINGS # -------------------------------------------- APP_ENV=production APP_DEBUG=false APP_KEY=&lt;APP_KEY&gt; APP_URL=http://127.0.0.1:8082 APP_TIMEZONE=Asia/Colombo APP_LOCALE=en . | Update the outgoing email server settings. # -------------------------------------------- # REQUIRED: OUTGOING MAIL SERVER SETTINGS # -------------------------------------------- MAIL_DRIVER=smtp MAIL_HOST=${MAIL_PORT_587_TCP_ADDR} MAIL_PORT=${MAIL_PORT_587_TCP_PORT} MAIL_USERNAME=${MAIL_ENV_USERNAME} MAIL_PASSWORD=${MAIL_ENV_PASSWORD} MAIL_ENCRYPTION=${MAIL_ENV_ENCRYPTION} MAIL_FROM_ADDR=${MAIL_ENV_FROM_ADDR} MAIL_FROM_NAME=${MAIL_ENV_FROM_NAME} MAIL_REPLYTO_ADDR=${MAIL_ENV_FROM_ADDR} MAIL_REPLYTO_NAME=${MAIL_ENV_FROM_NAME} . | . Example with a Gmail . Required to enable “Less secure app” settings at Gmail and generated password. email address only use to send the test email.* . # -------------------------------------------- # REQUIRED: OUTGOING MAIL SERVER SETTINGS # -------------------------------------------- MAIL_DRIVER=smtp MAIL_HOST=smtp.gmail.com MAIL_PORT=587 MAIL_USERNAME=your_username@gmail.com MAIL_PASSWORD=your_generated_password MAIL_ENCRYPTION=tls MAIL_FROM_ADDR=your_username@gmail.com MAIL_FROM_NAME=’ANY NAME’ MAIL_REPLYTO_ADDR=reciver_email@domain.com MAIL_REPLYTO_NAME=’ANY NAME’ . | Save the changes and restart the Snipe-IT container. exit sudo docker restart snipe-it . | . 8. Snipe-IT pre-flight setup . Browse to the IP address of your Ubuntu server and you should see the pre-flight page (http://example.com:8082). ",
     "url": "/docs/deployments/snipe-it/#install-snipe-it-via-docker",
     
     "relUrl": "/docs/deployments/snipe-it/#install-snipe-it-via-docker"
-  },"33": {
+  },"39": {
     "doc": "Snipe-IT Deployment",
     "title": "Install Snipe-IT via Apache",
     "content": "1. Update and upgrade installed packages on Linux server. sudo apt update &amp;&amp; sudo apt upgrade . 2. Install Apache, MySQL, PHP, PHP-FPM and PHP dependencies. | Install Apache. sudo apt install apache2 . | Install MySQL. sudo apt install mysql-server . | Install PHP and PHP-FPM. sudo add-apt-repository universesudo apt install php-fpm php-mysql . | Install PHP-Dependencies. sudo apt-get install -y git unzip php php-curl php-mysql php-gd php-ldap php-zip php-mbstring php-xml php-bcmath php-tokenizer . | . Check the packages are installed correctly. | MySQL server version &amp; status mysql –V or service mysql status | PHP Version php --version | Apache version &amp; status apache2 -V or systemctl status apache2 | . 3. Configure MySQL Server . | Run MySQL secure installation command line wizard and secure the installation. sudo mysql_secure_installation . | . Tips . | Do you want to Install Validate Password Plugin? : Better use Yes | Change the MySQL root user password. : Enter same password twice | Do you want to remove anonymous users? : Yes | Do you want to stop root login remotely? : Better use No | Do you want to reload privileges table: Yes | . Tips . If you get the following error while between the secure installation process, kill the current process and follow these steps; Failed! Error: SET PASSWORD has no significance for user ‘root’@’localhost’ as the authentication method used doesn’t store authentication data in the MySQL server. | Login to MySQL sudo mysql | Run This ALTER Query to change the authentication parameters. Replace placeholder (newpassword) with your preference. ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password by 'newpassword'; | . And now, you are able to run mysql_secure_installation command. 4. Create an initial database and a user for the Snipe-IT . | Login to MySQL server, provide password for MySQL root user when it prompts; sudo mysql -u root -p . | Create new database named snipeit_db. CREATE DATABASE snipeit_db; . | Create a new user named snipeit_user. Replace the password placeholder with your own. CREATE USER 'snipeit_user'@'localhost' IDENTIFIED BY 'password'; . | Grant permissions to the user (snipeit_user) on the database (snipeit_db). GRANT ALL PRIVILEGES ON snipeit_db.* TO 'snipeit_user'@'localhost'; . | Flush the privileges flush privileges; . | Exit from the MySQL server. quit; . | Restart MySQL service sudo service mysql restart . | . 5. Download the Snipe-IT latest version. | Change working directory to “/var/www/” cd /var/www/ . | Clone recent version of the Snipe-IT from GIT into a local folder (snipeit). sudo git clone https://github.com/snipe/snipe-it snipeit . | . 6. Update the .env file with the site, database and email configuration details. | Change working directory to “/var/www/snipeit/” cd /var/www/snipeit/ . | Make a copy of .env environmental file sudo cp .env.example .env . | Open .env file with a text editor. sudo vi .env or sudo nano .env . | Update the basic app settings. Replace the APP_URL with your domain (http://example.com). #-------------------------------------------- # REQUIRED: BASIC APP SETTINGS # -------------------------------------------- APP_ENV=production APP_DEBUG=false APP_KEY=&lt;APP_KEY&gt; APP_URL=http://127.0.0.1:8082 APP_TIMEZONE=Asia/Colombo APP_LOCALE=en . | Update the database settings. Replace the “DB_PASSWORD” placeholder with your MySQL snipeit user’s password. # -------------------------------------------- # REQUIRED: DATABASE SETTINGS # -------------------------------------------- DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_DATABASE=snipeit_db DB_USERNAME=snipeit_user DB_PASSWORD=&lt;password&gt; DB_PREFIX=null DB_DUMP_PATH='/usr/bin' DB_CHARSET=utf8mb4 DB_COLLATION=utf8mb4_unicode_ci . | Update the outgoing email server settings. # -------------------------------------------- # REQUIRED: OUTGOING MAIL SERVER SETTINGS # -------------------------------------------- MAIL_DRIVER=smtp MAIL_HOST=${MAIL_PORT_587_TCP_ADDR} MAIL_PORT=${MAIL_PORT_587_TCP_PORT} MAIL_USERNAME=${MAIL_ENV_USERNAME} MAIL_PASSWORD=${MAIL_ENV_PASSWORD} MAIL_ENCRYPTION=${MAIL_ENV_ENCRYPTION} MAIL_FROM_ADDR=${MAIL_ENV_FROM_ADDR} MAIL_FROM_NAME=${MAIL_ENV_FROM_NAME} MAIL_REPLYTO_ADDR=${MAIL_ENV_FROM_ADDR} MAIL_REPLYTO_NAME=${MAIL_ENV_FROM_NAME} . | Save the changes and exit. | . 7. Update folder permissions in the Snipe-IT root directory to the user of the Apache. sudo chown -R www-data:www-data /var/www/snipeit/ sudo chmod -R 755 storage public/uploads . 8. Download &amp; Install composer. | Change working directory to the Snipe-IT install directory. cd /var/www/snipeit . | Download the composer. curl -sS https://getcomposer.org/installer | php . | For local composer installations. php composer.phar install --no-dev --prefer-source . | For global composer installations. composer install --no-dev --prefer-source . | . 9. Generate an APP_Key for the .env file. | sudo php artisan key:generate . | Verify the generated APP_Key by opening the .env file and check “APP_KEY” value. cat /var/www/snipeit/.envornano /var/www/snipeit/.env . | . 10. Apache server configurations . | Create a new site configuration file with your preferred name. sudo cp /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/snipeit.conf . | Open the configuration file. sudo nano /etc/apache2/sites-available/snipeit.conf . | Add site content as follows, Replace Server Name to your Ubuntu Server’s IP address, and Document root and directory locations to Snipe-IT installation directory public folder (…/snipeit/public/). | . &lt;VirtualHost *:80&gt; &lt;Directory /var/www/snipeit/public/&gt; Allow From All AllowOverride None Options None &lt;/Directory&gt; DocumentRoot /var/www/snipeit/public/ ServerName 127.0.0.1 # Other directives here RewriteEngine On # From public/.htaccess RewriteCond %{DOCUMENT_ROOT}%{REQUEST_FILENAME} !-d RewriteCond %{REQUEST_URI} (.+)/$ RewriteRule ^ %1 [L,R=301] RewriteCond %{DOCUMENT_ROOT}%{REQUEST_FILENAME} !-d RewriteCond %{DOCUMENT_ROOT}%{REQUEST_FILENAME} !-f RewriteRule ^ /index.php [L] &lt;/VirtualHost&gt; . | Disable the default site sudo a2dissite 000-default.conf . | Enable the new site. sudo a2ensite snipeit.conf . | Restart the Apache service sudo systemctl reload apache2 . | . 11. Snipe-IT pre-flight setup . Browse to IP address of your Ubuntu server and you should see the pre-flight page (http://example.com). ",
     "url": "/docs/deployments/snipe-it/#install-snipe-it-via-apache",
     
     "relUrl": "/docs/deployments/snipe-it/#install-snipe-it-via-apache"
-  },"34": {
+  },"40": {
     "doc": "Snipe-IT Deployment",
     "title": "Install Snipe-IT via Nginx",
     "content": "1. Update and upgrade installed packages on Linux server. sudo apt update &amp;&amp; sudo apt upgrade . 2. Install NGINX, MySQL, PHP, PHP-FPM and PHP dependencies. | Install NGINX. sudo apt install nginx . | Install MySQL. sudo apt install mysql-server . | Install PHP and PHP-FPM. sudo add-apt-repository universesudo apt install php-fpm php-mysql . | Install PHP-Dependencies. sudo apt-get install -y git unzip php php-curl php-mysql php-gd php-ldap php-zip php-mbstring php-xml php-bcmath php-tokenizer . Check that the packages are installed correctly. | . 3. Configure MySQL Server . | Run MySQL secure installation command line wizard and secure the installation. sudo mysql_secure_installation . | . 4. Create an initial database and a user for the Snipe-IT . | Login to MySQL server, provide password for MySQL root user when it prompts; sudo mysql -u root -p . | Create new database named snipeit_db. CREATE DATABASE snipeit_db; . | Create a new user named snipeit_user. Replace the password placeholder with your own. CREATE USER 'snipeit_user'@'localhost' IDENTIFIED BY 'password'; . | Grant permissions to the user (snipeit_user) on the database (snipeit_db). GRANT ALL PRIVILEGES ON snipeit_db.* TO 'snipeit_user'@'localhost'; . | Flush the privileges flush privileges; . | Exit from the MySQL server. quit; . | Restart MySQL service sudo service mysql restart . | . 5. Download the Snipe-IT latest version. | Change working directory to “/var/www/” cd /var/www/ . | Clone recent version of the Snipe-IT from GIT into a local folder (snipeit). sudo git clone https://github.com/snipe/snipe-it snipeit . | . 6. Update the .env file with the site, database and email configuration details. | Change working directory to “/var/www/snipeit/” cd /var/www/snipeit/ . | Make a copy of .env environmental file sudo cp .env.example .env . | Open .env file with a text editor. sudo vi .env or sudo nano .env . | Update the basic app settings. Replace the APP_URL with your domain (http://example.com). #-------------------------------------------- # REQUIRED: BASIC APP SETTINGS # -------------------------------------------- APP_ENV=production APP_DEBUG=false APP_KEY=ChangeMe APP_URL=http://127.0.0.1 APP_TIMEZONE='UTC' APP_LOCALE=en MAX_RESULTS=500 . | Update the database settings. Replace the “DB_PASSWORD” placeholder with your MySQL snipeit user’s password. # -------------------------------------------- # REQUIRED: DATABASE SETTINGS # -------------------------------------------- DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_DATABASE=snipeit_db DB_USERNAME=snipeit_user DB_PASSWORD=&lt;password&gt; DB_PREFIX=null DB_DUMP_PATH='/usr/bin' DB_CHARSET=utf8mb4 DB_COLLATION=utf8mb4_unicode_ci . | Update the outgoing email server settings. # -------------------------------------------- # REQUIRED: OUTGOING MAIL SERVER SETTINGS # -------------------------------------------- MAIL_DRIVER=smtp MAIL_HOST=email-smtp.us-west-2.amazonaws.com MAIL_PORT=587 MAIL_USERNAME=YOURUSERNAME MAIL_PASSWORD=YOURPASSWORD MAIL_ENCRYPTION=null MAIL_FROM_ADDR=you@example.com MAIL_FROM_NAME='Snipe-IT' MAIL_REPLYTO_ADDR=you@example.com MAIL_REPLYTO_NAME='Snipe-IT' MAIL_AUTO_EMBED_METHOD='attachment' . | Save the changes and exit. | . 7. Update folder permissions in the Snipe-IT root directory to the user of the Nginx. sudo chown -R www-data:www-data /var/www/snipeit/sudo chmod -R 755 storage public/uploads . 8. Download &amp; Install composer. | Change working directory to the Snipe-IT install directory. cd /var/www/snipeit . | Download the composer. curl -sS https://getcomposer.org/installer | php . | For local composer installations. php composer.phar install --no-dev --prefer-source . | For global composer installations. composer install --no-dev --prefer-source . | . 9. Generate an APP_Key for the .env file. | sudo php artisan key:generate . | Verify the generated APP_Key by opening the .env file and check “APP_KEY” value. cat /var/www/snipeit/.envornano /var/www/snipeit/.env . | . 10. NGINX server configurations . | Create a new site with your preferred name. sudo nano /etc/nginx/sites-available/site_name . | Add site content as follows, Replace Server Name to your Ubuntu Server’s IP address, root location to Snipe-IT installation directory public folder, and the PHP-FPM version (Ex: php-fpm7.4 as php7.4-fpm). | . server { listen 80; listen [::]:80; server_name 127.0.0.1; root /var/www/snipeit/public/; index index.php index.html index.htm; access_log /var/log/nginx/site_name.access.log; error_log /var/log/nginx/site_name.error.log; location / { try_files $uri $uri/ /index.php$is_args$args; } location ~ \\.php$ { include snippets/fastcgi-php.conf; fastcgi_pass unix:/var/run/php/php7.4-fpm.sock; include fastcgi_params; fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; fastcgi_intercept_errors on; } } . | Enable the new site. sudo ln -s /etc/nginx/sites-available/site_name /etc/nginx/sites-enabled/ . | Disable default site sudo unlink /etc/nginx/sites-enabled/default . | Restart Nginx service sudo service nginx restart . | . 11. Snipe-IT pre-flight setup . Browse to IP address of your Ubuntu server and you should see the pre-flight page (http://example.com). ",
     "url": "/docs/deployments/snipe-it/#install-snipe-it-via-nginx",
     
     "relUrl": "/docs/deployments/snipe-it/#install-snipe-it-via-nginx"
-  },"35": {
+  },"41": {
     "doc": "Snipe-IT Deployment",
     "title": "Pre-Flight",
     "content": "Snipe-IT Pre-Flight . ",
     "url": "/docs/deployments/snipe-it/#pre-flight",
     
     "relUrl": "/docs/deployments/snipe-it/#pre-flight"
-  },"36": {
+  },"42": {
     "doc": "Snipe-IT Deployment",
     "title": "Screenshots",
     "content": ". ",
     "url": "/docs/deployments/snipe-it/#screenshots",
     
     "relUrl": "/docs/deployments/snipe-it/#screenshots"
-  },"37": {
+  },"43": {
     "doc": "Snipe-IT Deployment",
     "title": "Snipe-IT Deployment",
     "content": " ",
     "url": "/docs/deployments/snipe-it/",
     
     "relUrl": "/docs/deployments/snipe-it/"
+  },"44": {
+    "doc": "Zabbix Deployment",
+    "title": "Zabbix Deployment",
+    "content": "Zabbix is an open-source monitoring solution that provides real-time visibility into IT infrastructure, helping businesses track the performance and health of networks, servers, applications, and cloud services. | What is Zabbix? . | Core Containers (Essential for Zabbix to Function) | Optional Containers (For Enhanced Capabilities) | . | Steps to follow | Install Docker, and Docker-Compose . | Install Docker Engine | Install Docker-Compose | . | Deploy Zabbix | Screenshots | . ",
+    "url": "/docs/deployments/zabbix/",
+    
+    "relUrl": "/docs/deployments/zabbix/"
+  },"45": {
+    "doc": "Zabbix Deployment",
+    "title": "What is Zabbix?",
+    "content": "Zabbix is a robust and flexible open-source monitoring platform designed to monitor IT infrastructure and ensure systems’ health and availability. It is widely used by organizations to gain detailed insights into their environment and to prevent downtime through proactive monitoring. Key features include: . | Comprehensive Monitoring: Tracks performance metrics for networks, servers, applications, and cloud environments. | Real-Time Data Collection: Captures metrics via SNMP, IPMI, agent-based, and agentless methods. | Customizable Dashboards: Offers user-defined graphs, maps, and reports for visualizing data effectively. | Alerts and Notifications: Configurable triggers and notifications via email, SMS, or integrations with tools like Slack or Telegram. | Scalability: Supports small environments and large-scale, distributed infrastructures. | Open-Source and Extensible: Highly customizable with APIs, templates, and a community-driven ecosystem. | . Zabbix is a go-to solution for IT professionals seeking a reliable, cost-effective, and feature-rich tool to maintain infrastructure reliability and performance. Website Documentation GitHub . When deploying Zabbix with Docker, there are several core containers you need to set up, along with optional containers that enhance its monitoring capabilities. Core Containers (Essential for Zabbix to Function) . Zabbix Server . The central component that processes monitoring data, manages triggers, and sends notifications. Links to the database and connects to agents or proxies. Docker Image: zabbix/zabbix-server-mysql (or zabbix-server-pgsql for PostgreSQL). Database . Stores all configuration, history, and monitoring data. Supported options: MySQL, MariaDB, or PostgreSQL. Docker Image: For MySQL: mysql or mariadb. For PostgreSQL: postgres. Frontend (Web Interface) . Provides a user-friendly UI to configure, monitor, and analyze your setup. Docker Image: zabbix/zabbix-web-nginx-mysql (or zabbix-web-nginx-pgsql for PostgreSQL). Optional Containers (For Enhanced Capabilities) . Zabbix Agent . Collects monitoring data from hosts. Used for agent-based monitoring. Docker Image: zabbix/zabbix-agent. Zabbix Java Gateway . Enables monitoring of Java applications via JMX. Use Case: Monitoring JVM performance metrics, Java applications, or middleware like Tomcat or Kafka. Docker Image: zabbix/zabbix-java-gateway. Zabbix SNMP Traps . Adds support for SNMP trap collection. Use Case: Real-time event monitoring from SNMP-enabled devices like switches and routers. Docker Image: zabbix/zabbix-snmptraps. Zabbix Proxy . A distributed monitoring component to offload the main server. Use Case: Useful in large or geographically distributed environments to minimize latency and improve scalability. Docker Image: zabbix/zabbix-proxy-mysql (or zabbix-proxy-pgsql, zabbix-proxy-sqlite3). TimescaleDB . Extends the database for more efficient storage and querying of historical data. Use Case: Recommended for large-scale setups to improve performance. Docker Image: timescale/timescaledb. Alerting Tools . Use additional containers for integrations with alerting and communication tools (e.g., Slack, Telegram, PagerDuty). While not native Zabbix containers, they can be part of the ecosystem. To minimize complexity, we will use Docker Compose to deploy Zabbix. ",
+    "url": "/docs/deployments/zabbix/#what-is-zabbix",
+    
+    "relUrl": "/docs/deployments/zabbix/#what-is-zabbix"
+  },"46": {
+    "doc": "Zabbix Deployment",
+    "title": "Steps to follow",
+    "content": ". | Install Docker, and Docker-Compose | Deploy Zabbix | . ",
+    "url": "/docs/deployments/zabbix/#steps-to-follow",
+    
+    "relUrl": "/docs/deployments/zabbix/#steps-to-follow"
+  },"47": {
+    "doc": "Zabbix Deployment",
+    "title": "Install Docker, and Docker-Compose",
+    "content": "Install Docker Engine . Note . Find the official guide here. Follow this official guide for install Docker on other Linux distribution systems. 1. Uninstall old versions . sudo apt-get remove docker docker-engine docker.io containerd runc . 2. Set up the repository . Update the apt package index and install packages to allow apt to use a repository over HTTPS: . sudo apt-get update sudo apt-get install ca-certificates curl gnupg lsb-release . Add Docker’s official GPG key: . sudo mkdir -m 0755 -p /etc/apt/keyrings curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg . Use the following command to set up the repository: . echo \\ \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\ $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null . 3. Install Docker Engine . sudo apt-get update sudo apt-get install docker-ce docker-ce-cli containerd.io . Verify that the Docker Engine is installed correctly. sudo systemctl is-active docker . Install Docker-Compose . Ensure that the Docker Compose version you are using is v2 or higher. In this case (29/12/2024), it is v2.31.0; Refer to the GitHub Releases to identify the latest version. Download and install Compose standalone latest version . curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose sudo chmod +x /usr/local/bin/docker-compose . Verify that the Docker-Compose is installed correctly. sudo docker-compose --version . Tip: . If the command docker-compose fails after installation, check your path. You can also create a symbolic link to /usr/bin or any other directory in your path. For example: sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose . ",
+    "url": "/docs/deployments/zabbix/#install-docker-and-docker-compose",
+    
+    "relUrl": "/docs/deployments/zabbix/#install-docker-and-docker-compose"
+  },"48": {
+    "doc": "Zabbix Deployment",
+    "title": "Deploy Zabbix",
+    "content": "Clone the official Zabbix Docker repository, which includes various Docker Compose configurations using different technologies. git clone https://github.com/zabbix/zabbix-docker.git . The structure of the Zabbix repository is as follows: . └── 📁zabbix-docker-7.0 └── 📁Dockerfiles └── 📁agent └── 📁agent2 └── 📁build-base └── 📁build-mysql └── 📁build-pgsql └── 📁build-sqlite3 └── 📁java-gateway └── 📁proxy-mysql └── 📁proxy-sqlite3 └── 📁server-mysql └── 📁server-pgsql └── 📁snmptraps └── 📁web-apache-mysql └── 📁web-apache-pgsql └── 📁web-nginx-mysql └── 📁env_vars └── 📁mysql_init └── init_proxy_db.sql └── .env_agent └── .env_db_mysql └── .env_db_mysql_proxy └── .env_db_pgsql └── .env_java └── .env_prx └── .env_prx_mysql └── .env_prx_sqlite3 └── .env_snmptraps └── .env_srv └── .env_web └── .env_web_service └── .MYSQL_PASSWORD └── .MYSQL_ROOT_PASSWORD └── .MYSQL_ROOT_USER └── .MYSQL_USER └── .POSTGRES_PASSWORD └── .POSTGRES_USER └── chrome_dp.json └── .env └── .gitignore └── .pre-commit-config.yaml └── build.json └── build.sh └── compose_additional_components.yaml └── compose_databases.yaml └── compose_zabbix_components.yaml └── compose.yaml └── docker-compose_v3_alpine_mysql_latest.yaml └── docker-compose_v3_alpine_mysql_local.yaml └── docker-compose_v3_alpine_pgsql_latest.yaml └── docker-compose_v3_alpine_pgsql_local.yaml └── docker-compose_v3_centos_mysql_latest.yaml └── docker-compose_v3_centos_mysql_local.yaml └── docker-compose_v3_centos_pgsql_latest.yaml └── docker-compose_v3_centos_pgsql_local.yaml └── docker-compose_v3_ol_mysql_latest.yaml └── docker-compose_v3_ol_mysql_local.yaml └── docker-compose_v3_ol_pgsql_latest.yaml └── docker-compose_v3_ol_pgsql_local.yaml └── docker-compose_v3_ubuntu_mysql_latest.yaml └── docker-compose_v3_ubuntu_mysql_local.yaml └── docker-compose_v3_ubuntu_pgsql_latest.yaml └── docker-compose_v3_ubuntu_pgsql_local.yaml └── kubernetes.yaml └── LICENSE └── README.md └── SECURITY.md . The repository includes various Docker Compose files that can be used to deploy the Zabbix system. For example: . | docker-compose_v3_alpine_mysql_latest.yaml: This file uses Alpine as the base image, MySQL as the database, and pulls the latest Zabbix image from Docker Hub. | docker-compose_v3_alpine_mysql_local.yaml: This file also uses Alpine as the base image and MySQL as the database but builds the Zabbix image locally using the provided Dockerfile. | . Database secrets are stored in the env_vars directory. You need to update those files based on your database selection (MySQL or PostgreSQL) to ensure proper configuration. └── 📁zabbix-docker-7.0 └── 📁env_vars └── .MYSQL_PASSWORD └── .MYSQL_ROOT_PASSWORD └── .MYSQL_ROOT_USER └── .MYSQL_USER └── .POSTGRES_PASSWORD └── .POSTGRES_USER . Zabbix can be deployed in two ways without modifying the Docker Compose files: . | Deployment with Core Containers Only: This setup includes the essential containers required for Zabbix to function properly, such as the Zabbix Server, database, and front-end. | . docker-compose -f &lt;docker-compose-file-name&gt; up -d # Example docker-compose -f docker-compose_v3_alpine_mysql_latest.yaml up -d . | Deployment with Core and Optional Containers: This configuration includes all core containers along with additional optional containers that provide extended features, such as monitoring proxies, Java gateways, Zabbix agent, and more. | . docker-compose -f &lt;docker-compose-file-name&gt; --profile all up -d # Example docker-compose -f docker-compose_v3_alpine_mysql_latest.yaml --profile all up -d . Both deployment methods by default create an NGINX container to handle and redirect traffic on web ports such as port 80 and port 443. In addition, the ‘profile all’ method also creates an Apache container, which listens on port 8081 and port 8443. This setup provides flexibility in handling web traffic, allowing you to choose between different web server configurations based on your requirements. If you want to create specific containers, you can comment out the code sections for unwanted containers in your preferred Docker Compose file. After that, run the deployment using the --profile all parameter. This allows you to customize the deployment to include only the containers you need. Login to the Zabbox web interface . Default Admin User: . Username: Admin Password: zabbix . Now you can log in to the web UI. Simply use your browser to connect to your server by using the IP address or an FQDN. Next, you should change your username and password, and that’s it! . ",
+    "url": "/docs/deployments/zabbix/#deploy-zabbix",
+    
+    "relUrl": "/docs/deployments/zabbix/#deploy-zabbix"
+  },"49": {
+    "doc": "Zabbix Deployment",
+    "title": "Screenshots",
+    "content": ". . ",
+    "url": "/docs/deployments/zabbix/#screenshots",
+    
+    "relUrl": "/docs/deployments/zabbix/#screenshots"
   }
 }
